@@ -96,7 +96,7 @@ export class AuthService {
     }
 
     // Her şey doğruysa JWT Token oluştur
-    const payload = { sub: user.id, username: user.username, role: user.role };
+    const payload = { id: user.id, username: user.username, role: user.role };
     const accessToken = await this.jwtService.signAsync(payload);
 
     return {

@@ -6,6 +6,7 @@ import { Role } from '@prisma/client';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { InventoryService } from './inventory.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
+import { UnauthorizedException } from '@nestjs/common/exceptions/unauthorized.exception';
 
 @ApiTags('inventory')
 @ApiBearerAuth()
@@ -16,11 +17,19 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   // Yeni qaimə yaratmaq (anbara mal daxil etmə)
-  @Post()
-  @ApiOperation({ summary: 'Yeni qaimə yarat (anbara mal daxil et)' })
-  create(@Body() createInventoryDto: CreateInventoryDto, @Req() req: any) {
-    return this.inventoryService.create(createInventoryDto, req.user.id);
+// src/modules/inventory/inventory.controller.ts
+
+@Post()
+@UseGuards(JwtAuthGuard) // ⚠️ Mütləq lazımdır ki, token deşifrə olunsun
+@ApiOperation({ summary: 'Yeni qaimə yarat (anbara mal daxil et)' })
+async create(@Body() createInventoryDto: CreateInventoryDto, @Req() req: any) {
+  // Yoxlama əlavə edirik (Sales-də etdiyimiz kimi)
+  if (!req.user || !req.user.id) {
+    throw new UnauthorizedException('İstifadəçi məlumatı tapılmadı. Yenidən giriş edin.');
   }
+  
+  return this.inventoryService.create(createInventoryDto, req.user.id);
+}
 
   // Qaimə tarixçəsini filterlərlə gətirmək
   @Get()

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards, Req, UnauthorizedException } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -19,7 +19,12 @@ export class SalesController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Yeni satış yarat (kassadan)' })
-  create(@Body() createSaleDto: CreateSaleDto, @Req() req: any) {
+  async create(@Body() createSaleDto: CreateSaleDto, @Req() req: any) {
+    // userId-nin gəldiyini yoxlayırıq
+    if (!req.user || !req.user.id) {
+      throw new UnauthorizedException('İstifadəçi məlumatı tapılmadı.');
+    }
+    // userId-ni service-ə ötürürük
     return this.salesService.create(createSaleDto, req.user.id);
   }
 

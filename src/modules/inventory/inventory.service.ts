@@ -20,7 +20,7 @@ export class InventoryService {
 
     // Transaction ilə bütün əməliyyatları atomik şəkildə icra edirik
     const receipt = await this.prisma.$transaction(async (tx) => {
-      // 1. Hər bir məhsulun mövcudluğunu yoxlayırıq
+      // 1. Hər bir məhsulun mövcudluğunu yoxlayırıq və stokunu artırırıq
       for (const item of items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -43,13 +43,13 @@ export class InventoryService {
         });
       }
 
-      // 2. Yeni qaimə qeydi yaradırıq (təchizatçı ilə əlaqəli)
+      // 2. Yeni qaimə qeydi yaradırıq (təchizatçı və əməliyyatı edən istifadəçi ilə əlaqəli)
       const newReceipt = await tx.inventoryReceipt.create({
         data: {
           receiptCode,
           totalAmount,
           supplierId,
-          userId,
+          userId, // 🟢 BURA DƏYİŞDİ: Əməliyyatı edən şəxsin ID-si bazaya yazılır
           items: {
             create: items.map((item) => ({
               quantity: item.quantity,
@@ -65,6 +65,7 @@ export class InventoryService {
             },
           },
           supplier: true,
+          user: true, // 🟢 ƏLAVƏ EDİLDİ: Cavabda istifadəçi məlumatlarını da görmək üçün
         },
       });
 
@@ -76,21 +77,14 @@ export class InventoryService {
 
   // Keçmiş qaimələri (mal daxil olma tarixçəsini) filterlərlə gətirmək metodu
   async findAll(startDate?: string, endDate?: string, receiptCode?: string) {
-    // Prisma where filtri qururuq
     const where: any = {};
 
-    // Tarix aralığı filtri
     if (startDate || endDate) {
       where.date = {};
-      if (startDate) {
-        where.date.gte = new Date(startDate);
-      }
-      if (endDate) {
-        where.date.lte = new Date(endDate);
-      }
+      if (startDate) where.date.gte = new Date(startDate);
+      if (endDate) where.date.lte = new Date(endDate);
     }
 
-    // Qaimə kodu filtri
     if (receiptCode) {
       where.receiptCode = {
         contains: receiptCode,
@@ -98,7 +92,6 @@ export class InventoryService {
       };
     }
 
-    // Qaimələri əlaqəli məlumatlarla birlikdə gətiririk
     const receipts = await this.prisma.inventoryReceipt.findMany({
       where,
       include: {
@@ -108,6 +101,12 @@ export class InventoryService {
           },
         },
         supplier: true,
+        user: { // 🟢 ƏLAVƏ EDİLDİ: Tarixçədə qaiməni kimin vurduğunu görmək üçün
+          select: {
+            id: true,
+            username: true,
+          },
+        },
       },
       orderBy: {
         date: 'desc',
@@ -117,12 +116,10 @@ export class InventoryService {
     return receipts;
   }
 
-  // Benzersiz qaimə kodu generasiya metodu
   private async generateReceiptCode(): Promise<string> {
     let receiptCode = '';
     let exists = true;
 
-    // Unikal kod tapılana qədər davam edirik
     while (exists) {
       const randomNumber = Math.floor(100000 + Math.random() * 900000);
       receiptCode = `INV-${randomNumber}`;
