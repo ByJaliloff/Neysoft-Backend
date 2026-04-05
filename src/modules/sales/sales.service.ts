@@ -43,6 +43,14 @@ export class SalesService {
           );
         }
 
+        // 2. 🟢 YENİ: Qiymət yoxlaması (Tələb 2.3)
+        // Qiymət 0 ola bilər (hədiyyə/bonus), amma mənfi ola bilməz.
+        if (item.price < 0) {
+          throw new BadRequestException(
+            `"${product.name}" üçün satış qiyməti mənfi ola bilməz!`,
+          );
+        }
+
         // Anbar qalığını satılan miqdar qədər azaldırıq
         await tx.product.update({
           where: { id: item.productId },
